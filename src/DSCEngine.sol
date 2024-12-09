@@ -49,13 +49,14 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
  * for minting and redeeming DSC, as well as depositing and withdrawing collateral.
  * @notice This contract is based on the MakerDAO DSS system
  */
-contract DSCEngine {
+contract DSCEngine is ReentrancyGuard {
     ///////////////////
     //     Errors    //
     ///////////////////
 
     error DSCEngine__NeedsMoreThanZero();
     error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+    error DSCEngine__TokenNotSupported();
 
     /////////////////////////
     //   State Variables   //
@@ -63,6 +64,7 @@ contract DSCEngine {
 
     // @dev Mapping of token address to price feed address
     mapping(address collateralToken => address priceFeed) private s_priceFeeds;
+    mapping(address user => mapping(address token => uint256 amount)) private s_userCollateralDeposited;
     DecentralizedStableCoin private immutable i_dsc;
 
     ///////////////////
@@ -117,10 +119,13 @@ contract DSCEngine {
     */
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
         external
-        moreThanZero(amount)
-        isAllowedToken(tokenAddress)
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
         nonReentrant
-    {}
+    {
+        // Add the amount of collateral to the user's deposited collateral
+        s_userCollateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+    }
 
     function depositCollaterAndMintDsc() external {}
 
