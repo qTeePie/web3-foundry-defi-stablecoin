@@ -25,6 +25,10 @@ jobs:
         with:
           version: nightly
 
+      - name: Install Dependencies
+        run: |
+          make install
+
       - name: Show Forge version
         run: |
           forge --version
@@ -39,7 +43,10 @@ jobs:
           forge build --sizes
         id: build
 
-      - name: Run Forge tests
+      - name: Run Tests
         run: |
-          forge test -vvv
-        id: test
+          if grep -q "function test" $(find src/ -name "*.sol"); then
+            make test;
+          else
+            echo "No tests found! Skipping.";
+          fi
