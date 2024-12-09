@@ -28,6 +28,7 @@ pragma solidity ^0.8.18;
 pragma solidity ^0.8.18;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 
 /*
@@ -50,27 +51,32 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
  * @notice This contract is based on the MakerDAO DSS system
  */
 contract DSCEngine is ReentrancyGuard {
-    ///////////////////
-    //     Errors    //
-    ///////////////////
-
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     error DSCEngine__NeedsMoreThanZero();
     error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
-    error DSCEngine__TokenNotSupported();
+    error DSCEngine__TokenNotSupported(address token);
+    error DSCEngine__TransferFailed();
 
-    /////////////////////////
-    //   State Variables   //
-    /////////////////////////
-
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
     // @dev Mapping of token address to price feed address
     mapping(address collateralToken => address priceFeed) private s_priceFeeds;
+    // @dev Mapping of user address to token address to amount of collateral deposited
     mapping(address user => mapping(address token => uint256 amount)) private s_userCollateralDeposited;
+    // @dev DSC token contract
     DecentralizedStableCoin private immutable i_dsc;
 
-    ///////////////////
-    //   Modifiers   //
-    ///////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount0);
 
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
     modifier moreThanZero(uint256 amount) {
         if (amount <= 0) {
             revert DSCEngine__NeedsMoreThanZero();
@@ -81,14 +87,14 @@ contract DSCEngine is ReentrancyGuard {
     modifier isAllowedToken(address tokenAddress) {
         // Check if tokenAddress is allowed
         if (s_priceFeeds[tokenAddress] == address(0)) {
-            revert DSCEngine__TokenNotSupported();
+            revert DSCEngine__TokenNotSupported(tokenAddress);
         }
         _;
     }
 
-    ///////////////////
-    //   Functions   //
-    ///////////////////
+    /*//////////////////////////////////////////////////////////////
+                               FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     /**
      * @notice Constructor takes parameters for the token addresses and price feed addresses
      * @param tokenAddresses: The addresses of the ERC20 tokens that are allowed as collateral
@@ -104,14 +110,12 @@ contract DSCEngine is ReentrancyGuard {
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
             s_priceFeeds[tokenAddresses[i]] = _priceFeedAddresses[i];
         }
-
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
 
-    ///////////////////////////
-    //   External Functions  //
-    ///////////////////////////
-
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     /*
     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
     * @param amountCollateral: The amount of collateral you're depositing
@@ -125,6 +129,11 @@ contract DSCEngine is ReentrancyGuard {
     {
         // Add the amount of collateral to the user's deposited collateral
         s_userCollateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+        // Just updated contract state, lets emit an event
+        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+
+        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+        if (!success) revert DSCEngine__TransferFailed();
     }
 
     function depositCollaterAndMintDsc() external {}
