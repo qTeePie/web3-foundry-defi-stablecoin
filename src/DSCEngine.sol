@@ -74,6 +74,10 @@ contract DSCEngine is ReentrancyGuard {
     // @dev Accepted collateral tokens
     address[] private s_collateralTokens;
 
+    // Numbers to get precise price of the collateral (decimals of the price feed expected to be 1e18)
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant PRECISION = 1e18;
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -195,7 +199,7 @@ contract DSCEngine is ReentrancyGuard {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_userCollateralDeposited[user][token];
-            totalCollateralValueInUsd += 0;
+            totalCollateralValueInUsd += getUsdValue(token, amount);
         }
 
         return totalCollateralValueInUsd;
@@ -204,5 +208,11 @@ contract DSCEngine is ReentrancyGuard {
     /**
      * Call chainlink to fetch real-time value of collateral
      */
-    function getUsdValue(address token, uint256 amount) public view returns (uint256) {}
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+        // Initi aggregatorv3interface with pricefeed of collateral token.
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+
+        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
+    }
 }
