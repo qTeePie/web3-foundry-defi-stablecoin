@@ -59,6 +59,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine__TokenNotSupported(address token);
     error DSCEngine__TransferFailed();
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -77,6 +78,9 @@ contract DSCEngine is ReentrancyGuard {
     // Numbers to get precise price of the collateral (decimals of the price feed expected to be 1e18)
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50;
+    uint256 private constant LUQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -161,24 +165,34 @@ contract DSCEngine is ReentrancyGuard {
      */
     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_userDscMinted[msg.sender] += amountDscToMint;
+        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     function burnDsc() external {}
 
     function liquidate() external {}
 
-    function getHealthFactor() external view {}
-
     /*//////////////////////////////////////////////////////////////
                    PRIVATE & INTERNAL VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function _revertIfHealthFactorIsBroken(address user) internal view {}
+    function _revertIfHealthFactorIsBroken(address user) internal view {
+        uint256 userHealthFactor = _healthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert DSCEngine__BreaksHealthFactor(userHealthFactor);
+        }
+    }
+
     /**
      * Returns how close to liquidation a user is
      * If a user goes below 1, then they can be liquidated.
-     * To deternmine an accounts health factor, we neeed
      */
-    function _healthFactor(address user) private view returns (uint256) {}
+    function _healthFactor(address user) private view returns (uint256) {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LUQUIDATION_PRECISION;
+
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
+    }
 
     function _getAccountInformation(address user)
         private
@@ -186,16 +200,30 @@ contract DSCEngine is ReentrancyGuard {
         returns (uint256 totalDscMinted, uint256 collateralValueUsd)
     {
         totalDscMinted = s_userDscMinted[user];
-        collateralValueUsd = getAccountCollateralValue(user);
+        collateralValueUsd = getUserCollateralValue(user);
+    }
+
+    /**
+     * Call chainlink to fetch real-time value of collateral
+     */
+    function getUsdValue(address token, uint256 amount) private view returns (uint256) {
+        // Initi aggregatorv3interface with pricefeed of collateral token.
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        // 1 ETH = 1000 USD
+        // The returned value from Chainlink will be 1000 * 1e8
+        // Most USD pairs have 8 decimals, so we will just pretend they all do
+        // We want to have everything in terms of WEI, so we add 10 zeros at the end
+        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 
     /*//////////////////////////////////////////////////////////////
-                    PUBLIC & EXTERNAL VIEW FUNCTIONS
+                PUBLIC & EXTERNAL VIEW  & PURE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
      * Get the price feed of collateral to know its value at any given time
      */
-    function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
+    function getUserCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_userCollateralDeposited[user][token];
@@ -205,14 +233,5 @@ contract DSCEngine is ReentrancyGuard {
         return totalCollateralValueInUsd;
     }
 
-    /**
-     * Call chainlink to fetch real-time value of collateral
-     */
-    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
-        // Initi aggregatorv3interface with pricefeed of collateral token.
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
-
-        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
-    }
+    function getHealthFactor() external view {}
 }
