@@ -131,27 +131,21 @@ contract DSCEngine is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    /**
-     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
-     * @param amountCollateral: The amount of collateral you're depositing
-     * nonReentrant modifier is used to prevent reentrancy attacks
-     */
-    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
-        moreThanZero(amountCollateral)
-        isAllowedToken(tokenCollateralAddress)
-        nonReentrant
-    {
-        // Add the amount of collateral to the user's deposited collateral
-        s_userCollateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
-        // Just updated contract state, lets emit an event
-        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
 
-        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
-        if (!success) revert DSCEngine__TransferFailed();
+    /*
+    * @param tokenCollateralAddress: the address of the token to deposit as collateral
+    * @param amountCollateral: The amount of collateral to deposit
+    * @param amountDscToMint: The amount of DecentralizedStableCoin to mint
+    * @notice: This function will deposit your collateral and mint DSC in one transaction
+    */
+    function depositCollateralAndMintDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    ) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
     }
-
-    function depositCollaterAndMintDsc() external {}
 
     function redeemCollateralForDsc() external {}
 
@@ -172,9 +166,33 @@ contract DSCEngine is ReentrancyGuard {
         if (!minted) revert DSCEngine__MintFailed();
     }
 
+    /**
+     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
+     * @param amountCollateral: The amount of collateral you're depositing
+     * nonReentrant modifier is used to prevent reentrancy attacks
+     */
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        public
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
+        nonReentrant
+    {
+        // Add the amount of collateral to the user's deposited collateral
+        s_userCollateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+        // Just updated contract state, lets emit an event
+        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+
+        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+        if (!success) revert DSCEngine__TransferFailed();
+    }
+
     function burnDsc() external {}
 
     function liquidate() external {}
+
+    /*//////////////////////////////////////////////////////////////
+                           PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /*//////////////////////////////////////////////////////////////
                    PRIVATE & INTERNAL VIEW FUNCTIONS
