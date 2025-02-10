@@ -1,0 +1,11 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "func-name-mixedcase": "off",
+    "var-name-mixedcase": "off",
+    "private-vars-leading-underscore": "off",
+    "contract-name-camelcase": "off",
+    "state-visibility": "off",
+    "no-unused-vars": "off"
+  }
+}
