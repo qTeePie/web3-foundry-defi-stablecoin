@@ -28,7 +28,7 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
  *  🐱‍👤 Balances[msg.sender] should never be negative.
  *  🐱‍💻 Getter view functions should never revert.
  */
-contract InvariantsTest is StdInvariant, Test {
+contract Invariants is StdInvariant, Test {
     DeployDSC deployer;
     DSCEngine dsce;
     DecentralizedStableCoin dsc;
@@ -44,9 +44,7 @@ contract InvariantsTest is StdInvariant, Test {
         targetContract(address(dsce));
     }
 
-    /**
-     * Test that our invariant: value of DSC tokens minted never succeed collateral value
-     */
+    // Test that our invariant: value of DSC tokens minted never succeed collateral value
     function invariant_protocolMustHaveMoreValueThanTotalSupply() public view {
         uint256 totalSupply = dsc.totalSupply();
         uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dsce));
@@ -54,5 +52,8 @@ contract InvariantsTest is StdInvariant, Test {
 
         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalWbtcDeposited);
+
+        // Assert totalSupply DSC
+        assert(wethValue + wbtcValue >= totalSupply);
     }
 }

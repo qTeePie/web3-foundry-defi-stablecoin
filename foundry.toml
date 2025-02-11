@@ -11,4 +11,4 @@ remappings = [
 [invariant]
 runs = 128
 depth = 128
-fail_on_revert = false
+fail_on_revert = true
