@@ -9,6 +9,7 @@ import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {Handler} from "./Handler.t.sol";
 
 /**
  *  Finding invariants in a code-base is about identifying the core rules that must always be true.
@@ -33,6 +34,7 @@ contract Invariants is StdInvariant, Test {
     DSCEngine dsce;
     DecentralizedStableCoin dsc;
     HelperConfig config;
+    Handler handler;
     address weth;
     address wbtc;
 
@@ -41,7 +43,8 @@ contract Invariants is StdInvariant, Test {
         (dsc, dsce, config) = deployer.run();
         (,, weth, wbtc,) = config.activeNetworkConfig();
         // Setting address of our DSCEngine contract (to be called during fuzz-testing)
-        targetContract(address(dsce));
+        handler = new Handler(dsce, dsc);
+        targetContract(address(handler));
     }
 
     // Test that our invariant: value of DSC tokens minted never succeed collateral value
