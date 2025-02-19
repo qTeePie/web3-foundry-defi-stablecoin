@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.18;
 
+import {console} from "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -55,6 +56,11 @@ contract Invariants is StdInvariant, Test {
 
         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalWbtcDeposited);
+
+        console.log("wethValue: ", wethValue);
+        console.log("wbtcValue: ", wbtcValue);
+        console.log("totalSupply: ", totalSupply);
+        console.log("Times Mint Called: ", handler.timesMintCalled());
 
         // Assert totalSupply DSC
         assert(wethValue + wbtcValue >= totalSupply);
