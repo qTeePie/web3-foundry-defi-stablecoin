@@ -9,8 +9,9 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 
 contract Handler is Test {
-    DSCEngine dsce;
-    DecentralizedStableCoin dsc;
+    DSCEngine private dsce;
+    DecentralizedStableCoin private dsc;
+    MockV3Aggregator private ethUsdPriceFeed;
 
     ERC20Mock wbtc;
     ERC20Mock weth;
@@ -28,6 +29,8 @@ contract Handler is Test {
         address[] memory collateralTokens = dsce.getCollateralTokens();
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
+
+        ethUsdPriceFeed = MockV3Aggregator(dsce.getCollateralTokenPriceFeed(address(weth)));
     }
 
     // redeem collateral
@@ -84,8 +87,18 @@ contract Handler is Test {
         timesMintCalled++;
     }
 
-    // Helper Functions
+    // THIS BREAKS OUR INVARIANT TEST SUITE!!!
+    // function updateCollateralPrice(uint96 newPrice) public {
+    //     int256 newPriceInt = int256(uint256(newPrice));
+    //     ethUsdPriceFeed.updateAnswer(newPriceInt);
+    // }
 
+    /**
+     * So, we've uncovered a potentially critical vulnerability in this protocol. Either we would go back and adjust the code to account for this, or a developer would accept this as a known bug in hopes that prices are more stable than what our tests imply.
+     * These are the types of scenarios that invariant tests are incredible at spotting.
+     */
+
+    // Helper Functions
     function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
         if (collateralSeed % 2 == 0) {
             return weth;
